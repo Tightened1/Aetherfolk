@@ -393,7 +393,7 @@ function genRegion(ri){
     const s = freeSpot(tx0+1,ty0+1,tx0+tw-1,ty0+th-1);
     if(s) objs.push({...s, kind:"npc", text: lines[(ri*3+i)%lines.length], name:["Villager","Warden","Elder"][i]});
   }
-  objs.push({x:tx0+4,y:ty0+7,kind:"sign",name:"Notice board",
+  objs.push({x:tx0+2,y:ty0+16,kind:"sign",name:"Notice board",
     text:`${reg.town}, in ${reg.name}. The arena stands to the south. ${reg.leader} keeps the ${reg.badge}.`});
 
   // trainers along the routes
@@ -440,6 +440,17 @@ function genRegion(ri){
   }
   // cheap guard: a region without an arena door cannot be completed
   if(!Array.prototype.includes.call(t, T.GYM)) console.warn("Aetherfolk: region "+ri+" generated without an arena door");
+
+  // Nothing may sit on the square in front of a door, or the building
+  // becomes unreachable. A notice board once blocked the recovery house.
+  const approach = new Set();
+  buildings.forEach(b=>{
+    if(!b.door) return;
+    approach.add((b.x+Math.floor(b.w/2))+","+(b.y+b.h));
+  });
+  for(let i=objs.length-1;i>=0;i--){
+    if(approach.has(objs[i].x+","+objs[i].y)) objs.splice(i,1);
+  }
 
   const m = {tiles:t, objs, spawn:{x:tx0+2, y:ty0+8}, gateY, buildings, tx0, ty0, tw, th};
   mapCache[ri]=m;

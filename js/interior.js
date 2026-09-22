@@ -39,9 +39,12 @@ function makeInterior(kind, ri){
   const set = (x,y,v)=>{ if(x>=0&&y>=0&&x<w&&y<h) t[y*w+x]=v; };
   const props = [];
   const objs = [];
+  // flat scenery you walk over, rather than furniture you bump into
+  const FLAT = {rug:1};
   const addProp = (name,x,y)=>{
     const [tx,ty,pw,ph] = INT_PROP[name];
     props.push({tx,ty,pw,ph,x,y});
+    if(FLAT[name]) return;
     for(let j=0;j<ph;j++) for(let i=0;i<pw;i++) set(x+i, y+j, T.PROP);
   };
 

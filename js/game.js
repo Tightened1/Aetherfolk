@@ -250,11 +250,11 @@ function interact(){
   if(t===T.HEAL) return enterInterior("heal");
   if(t===T.SHOP) return enterInterior("shop");
   if(t===T.GYM)  return enterInterior("gym");
-  if(o && o.kind==="heal") return openHeal();
-  if(o && o.kind==="shop") return openShop();
-  if(o && o.kind==="gym")  return openGym();
   const o = objAt(nx,ny);
   if(!o) return;
+  if(o.kind==="heal") return openHeal();
+  if(o.kind==="shop") return openShop();
+  if(o.kind==="gym")  return openGym();
   if(o.kind==="npc"||o.kind==="sign") return showDialog({name:o.name, text:o.text});
   if(o.kind==="trainer") return startTrainerBattle(o);
   if(o.kind==="item") return pickUpItem(o);
