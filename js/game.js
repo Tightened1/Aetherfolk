@@ -74,28 +74,26 @@ function draw(){
     drawables.push({y:o.y, fn:()=>{
       if(o.kind==="item"){
         const bob = Math.sin(t*.003 + o.x + o.y)*2;
-        ctx.fillStyle="rgba(0,0,0,.24)"; ctx.beginPath(); ctx.ellipse(sx+16,sy+27,8,3.6,0,0,7); ctx.fill();
-        ctx.fillStyle="#8A6A2E"; ctx.fillRect(sx+7,sy+11+bob,18,13);
-        ctx.fillStyle="#C99A3E"; ctx.fillRect(sx+7,sy+11+bob,18,6);
-        ctx.fillStyle="#EFE6D2"; ctx.fillRect(sx+7,sy+16+bob,18,2.5);
-        ctx.fillStyle="#7A5A22"; ctx.fillRect(sx+14,sy+11+bob,4,13);
-        ctx.fillStyle="rgba(255,255,255,.35)"; ctx.fillRect(sx+9,sy+12.5+bob,4,2);
+        const im = IMG.grass;
+        ctx.fillStyle="rgba(0,0,0,.24)"; ctx.beginPath(); ctx.ellipse(sx+16,sy+28,8,3.6,0,0,7); ctx.fill();
+        ctx.fillStyle="#C9A13E"; ctx.fillRect(sx+8,sy+12+bob,16,12);
+        ctx.fillStyle="#E8CE7A"; ctx.fillRect(sx+8,sy+12+bob,16,5);
+        ctx.fillStyle="#6B4A18"; ctx.fillRect(sx+8,sy+18+bob,16,2); ctx.fillRect(sx+14,sy+12+bob,4,12);
+        ctx.fillStyle="rgba(255,255,255,.4)"; ctx.fillRect(sx+10,sy+13+bob,4,2);
       } else if(o.kind==="sign"){
-        ctx.fillStyle="rgba(0,0,0,.2)"; ctx.beginPath(); ctx.ellipse(sx+16,sy+29,8,3.4,0,0,7); ctx.fill();
-        ctx.fillStyle="#6B5326"; ctx.fillRect(sx+14,sy+19,4,10);
-        ctx.fillStyle="#A8834C"; ctx.fillRect(sx+4,sy+6,24,14);
-        ctx.fillStyle="#C9A567"; ctx.fillRect(sx+5,sy+7,22,5);
-        ctx.fillStyle="#5A4227"; ctx.fillRect(sx+7,sy+13,18,2); ctx.fillRect(sx+7,sy+16,11,2);
+        ctx.imageSmoothingEnabled=false;
+        const im = IMG.ruin_pillar_broke;
+        ctx.drawImage(im,0,0,im.width,im.height, sx+16-im.width, sy+32-im.height*2, im.width*2, im.height*2);
       } else {
         const pal = NPC_PALS[(o.x*3+o.y+(o.idx||0))%NPC_PALS.length];
         const dir = o.kind==="trainer"? "down" : ["down","left","right","up"][(o.x+o.y)%4];
-        const fr = o.kind==="trainer"? 0 : Math.floor(t/380 + o.x)%2;
-        drawPerson(ctx, sx, sy, dir, fr, pal);
+        const fr = o.kind==="trainer"? 0 : Math.floor(t/380 + o.x)%4;
+        const use = o.kind==="trainer"? {sheet:BOSS_PALS[(o.idx||0)%BOSS_PALS.length]} : pal;
+        drawPerson(ctx, sx, sy, dir, fr, use);
         if(o.kind==="trainer"){
           const fl = Math.sin(t*.004+o.x)*1.6;
           ctx.fillStyle="#E0A73C"; ctx.beginPath();
-          ctx.moveTo(sx+16,sy-12+fl); ctx.lineTo(sx+21,sy-3+fl); ctx.lineTo(sx+11,sy-3+fl); ctx.closePath(); ctx.fill();
-          ctx.fillStyle="#7A5A1E"; ctx.fillRect(sx+15,sy-4+fl,3,3);
+          ctx.moveTo(sx+16,sy-16+fl); ctx.lineTo(sx+21,sy-7+fl); ctx.lineTo(sx+11,sy-7+fl); ctx.closePath(); ctx.fill();
         }
       }
     }});
@@ -106,10 +104,11 @@ function draw(){
   // tall grass closes over whoever is standing in it
   const grassOver = (gx,gy)=>{
     if(tileAt(gx,gy)!==T.TALL) return;
-    const bx = BLOCKS[REGION_ART[G.region].block];
+    const im = IMG[REGION_ART[G.region].tuft];
     const sway = Math.sin(t*.0035+gx)*1.5;
-    ctx.drawImage(IMG.floor, (bx[0]+REL.bush[0])*SRC, (bx[1]+REL.bush[1])*SRC, SRC, SRC,
-      Math.round(gx*TILE-camX+sway), Math.round(gy*TILE-camY+8), TILE, TILE-8);
+    ctx.imageSmoothingEnabled=false;
+    ctx.drawImage(im, 0, 0, im.width, im.height,
+      Math.round(gx*TILE-camX+sway), Math.round(gy*TILE-camY+10), TILE, TILE-10);
   };
   grassOver(P.x,P.y);
   if(P.moving) grassOver(P.tx,P.ty);
@@ -138,7 +137,7 @@ function step(){
   if(P.moving){
     P.prog += 0.19;
     P.anim++;
-    P.frame = Math.floor(P.anim/6)%2;
+    P.frame = Math.floor(P.anim/5)%4;
     const [dx,dy] = DIRV[P.dir];
     P.px = (P.x+dx*Math.min(1,P.prog))*TILE;
     P.py = (P.y+dy*Math.min(1,P.prog))*TILE;

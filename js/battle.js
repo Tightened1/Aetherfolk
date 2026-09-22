@@ -35,29 +35,8 @@ function banner(text, ms){
 /* ---------------- battle backdrop ---------------- */
 function battleScene(){
   const A = REGION_ART[G.region];
-  const hill1 = A.hill, hill2 = mix(A.hill, A.sky[1], .35);
-  const svg =
-   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="sk" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${A.sky[0]}"/><stop offset="70%" stop-color="${A.sky[1]}"/></linearGradient>
-        <linearGradient id="gr" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${A.ground}"/><stop offset="100%" stop-color="${mix(A.ground,"#000000",.40)}"/></linearGradient>
-        <radialGradient id="sn"><stop offset="0%" stop-color="#FFF6DC" stop-opacity=".95"/>
-          <stop offset="100%" stop-color="#FFF6DC" stop-opacity="0"/></radialGradient>
-      </defs>
-      <rect width="400" height="300" fill="url(#sk)"/>
-      <circle cx="308" cy="52" r="46" fill="url(#sn)"/>
-      <circle cx="308" cy="52" r="17" fill="#FFF3D2" opacity=".85"/>
-      <path d="M0 150 q40 -38 84 -14 q34 18 62 -6 q40 -34 82 -6 q36 26 78 2 q36 -20 94 6 L400 300 L0 300 Z" fill="${hill2}" opacity=".75"/>
-      <path d="M0 182 q54 -34 106 -8 q44 22 86 -4 q50 -30 104 0 q44 22 104 -2 L400 300 L0 300 Z" fill="${hill1}"/>
-      <rect y="232" width="400" height="68" fill="url(#gr)"/>
-      <path d="M0 232 q46 -12 92 2 q54 16 108 0 q56 -16 110 2 q44 12 90 -4 L400 246 L0 246 Z" fill="${A.ground}" opacity=".7"/>
-    </svg>`;
-  $("battle").style.backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-  document.querySelectorAll(".plat").forEach(p=>{
-    p.style.background = `radial-gradient(60% 100% at 50% 0%, ${mix(A.ground,"#FFFFFF",.20)}, ${mix(A.ground,"#000000",.34)})`;
-  });
+  $("battle").style.backgroundImage = `url("assets/bg/${A.bg}.png")`;
+  document.querySelectorAll(".plat").forEach(p=>{ p.style.background = "none"; });
 }
 
 function renderSide(which){

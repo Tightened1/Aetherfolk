@@ -8,72 +8,275 @@ const TILE = 32;
 const MW = 52, MH = 40;
 const mapCache = {};
 
-/* ---------------- region art ----------------
-   Terrain comes from tileset_floor.png, which is laid out as six
-   11x7 blocks. Within a block the tiles sit at fixed offsets, so
-   one small table drives every region. Blocks are re-used with a
-   colour wash to give eight distinct moods from six sets of art. */
 
-const BLOCKS = { sand:[0,0], rose:[11,0], grass:[0,7], deepgrass:[11,7], snow:[0,14], mud:[11,14], pool:[0,21] };
-/* offsets inside a block, in tiles */
-const REL = {
-  patch:   [0,0],   // 3x3 autotile for paths and dirt
-  center:  [1,1],
-  patchDeco:[0,4],
-  base:    [0,5],   // plain ground
-  baseDeco:[1,5],   // four decorated ground variants follow
-  bush:    [0,6]    // encounter grass
-};
+/* ---------------- region art ----------------
+   Art is scarloxy's MyPixelWorld Special Pack #01 (CC BY 4.0), used at its
+   native 16px. The world tileset is laid out as 3x3 autotile blocks: the
+   centre tile is the material, the surrounding eight are its edges against
+   the material underneath. Every region is grass with autotiled sand paths;
+   character comes from the patch material, the tree and rock set, and the
+   arena. That way every fringe tile is the one the artist drew for it. */
+
+const SRC = 16;              // native tile size
+const SCALE = TILE / SRC;    // world tiles are 32px, so everything draws at 2x
+
+const TILE_AT = { grass:[1,4], sand:[1,1], snow:[1,13] };
+const BLOCK = { sand:[0,0], snow:[0,12] };   // 3x3 autotile origins in world.png
+const WATER_BLOCK = [0,0];                   // in coast.png; frame f sits at row +f*3
 
 const REGION_ART = [
-  {block:"grass",     wash:null,              mote:"leaf",  moteCol:"#DFF3B8",
-   sky:["#79A9C4","#C8DCC0"], ground:"#5E9450", hill:"#2E6136"},
-  {block:"sand",      wash:["#B8431F",0.16],  mote:"ember", moteCol:"#FFB067",
-   sky:["#8A5540","#D9A06A"], ground:"#B08048", hill:"#6D4326"},
-  {block:"deepgrass", wash:["#2E7BA8",0.14],  mote:"spray", moteCol:"#D6F2F7",
-   sky:["#6FA8C8","#CFE6DC"], ground:"#4A8A66", hill:"#2F5F4C"},
-  {block:"mud",       wash:["#E8D24A",0.20],  mote:"spark", moteCol:"#FFF0A0",
-   sky:["#7A7E9A","#D0CFA8"], ground:"#9A9250", hill:"#5A5A2E"},
-  {block:"rose",      wash:["#7E7566",0.34], desat:0.45,  mote:"dust",  moteCol:"#E8DCC0",
-   sky:["#9A8E78","#DCD2B8"], ground:"#9A9280", hill:"#5F5A4A"},
-  {block:"snow",      wash:["#43336E",0.50], desat:0.35,  mote:"wisp",  moteCol:"#C8B4F0",
-   sky:["#433C62","#8A7FA8"], ground:"#5A5080", hill:"#332E52"},
-  {block:"snow",      wash:["#8CBEDE",0.30], desat:0.62,  mote:"snow",  moteCol:"#FFFFFF",
-   sky:["#8FB4C8","#E4F0F6"], ground:"#C3D6E0", hill:"#4E7684"},
-  {block:"rose",      wash:["#6E2F5E",0.40], desat:0.30,  mote:"ember", moteCol:"#F0BCA0",
-   sky:["#6A4460","#E0A88A"], ground:"#8A5A78", hill:"#4E2F48"}
+  { patch:"sand", trees:["green_tree","green_tree_bushy","green_tree_small"],
+    rocks:["grassrock1","grassrock2"], tuft:"grass", arena:"arena_plant",
+    bg:"forest", mote:"leaf",  moteCol:"#DFF3B8", ruins:false, patchAt:0.70 },
+  { patch:"sand", trees:["green_tree_small","palm_small"],
+    rocks:["sandrock1","sandrock2"], tuft:"grass", arena:"arean_fire",
+    bg:"sand",   mote:"ember", moteCol:"#FFB067", ruins:true, patchAt:0.40 },
+  { patch:"sand", trees:["palm","palm_alt","palm_small"],
+    rocks:["sandrock1","sandrock2"], tuft:"grass", arena:"arena_water",
+    bg:"sand",   mote:"spray", moteCol:"#D6F2F7", ruins:false, patchAt:0.46 },
+  { patch:"sand", trees:["teal_tree","teal_tree_bushy","teal_tree_small"],
+    rocks:["grassrock1","grassrock2"], tuft:"grass", arena:"arena_plant",
+    bg:"forest", mote:"spark", moteCol:"#FFF0A0", ruins:false, patchAt:0.68 },
+  { patch:"sand", trees:["green_tree_small","teal_tree_small"],
+    rocks:["sandrock1","sandrock2"], tuft:"grass", arena:"arena_plant",
+    bg:"sand",   mote:"dust",  moteCol:"#E8DCC0", ruins:true, patchAt:0.38 },
+  { patch:"sand", trees:["teal_tree_bushy","teal_tree","teal_tree_small"],
+    rocks:["grassrock1","grassrock2"], tuft:"grass", arena:"arena_water",
+    bg:"forest", mote:"wisp",  moteCol:"#C8B4F0", ruins:true, patchAt:0.66 },
+  { patch:"snow", trees:["ice_tree","teal_tree_small","ice_tree"],
+    rocks:["icerock1","icerock2"], tuft:"grass_ice", arena:"arena_water",
+    bg:"ice",    mote:"snow",  moteCol:"#FFFFFF", ruins:false, patchAt:0.20 },
+  { patch:"sand", trees:["teal_tree","green_tree_small"],
+    rocks:["sandrock1","sandrock2"], tuft:"grass", arena:"arean_fire",
+    bg:"sand",   mote:"ember", moteCol:"#F0BCA0", ruins:true, patchAt:0.42 }
 ];
-function regionTint(i){ return ["#4E8449","#437640"]; }
+function regionTint(i){ return ["#6E8C3A","#5E7A32"]; }
 
 /* ---------------- art loading ---------------- */
 const ART_SRC = {
-  floor:   "assets/tileset_floor.png",
-  village: "assets/tileset_village_abandoned.png",
-  flower:  "assets/tileset_animated.png",
-  char0:   "assets/char_ninja_blue.png",
-  char1:   "assets/char_samurai_blue.png",
-  char2:   "assets/char_samurai_green.png",
-  animal:  "assets/pig.png"
+  world:"assets/tiles/world.png", coast:"assets/tiles/coast.png",
+  shadow:"assets/objects/shadow.png",
+  bg_forest:"assets/bg/forest.png", bg_ice:"assets/bg/ice.png", bg_sand:"assets/bg/sand.png"
 };
+["green_tree","green_tree_bushy","green_tree_small","teal_tree","teal_tree_bushy",
+ "teal_tree_small","ice_tree","palm","palm_alt","palm_small","grass","grass_ice",
+ "grassrock1","grassrock2","sandrock1","sandrock2","icerock1","icerock2",
+ "house_small","house_small_alt","house_large","house_large_alt","hospital",
+ "arena_plant","arena_water","arean_fire","ruin_pillar","ruin_pillar_broke",
+ "ruin_gate","gate_pillar","gate_top"].forEach(n=> ART_SRC[n] = "assets/objects/"+n+".png");
+const CHARS = ["player","blond","hat_girl","purple_girl","straw","young_girl",
+               "young_guy","fire_boss","grass_boss","water_boss"];
+CHARS.forEach(n=> ART_SRC["ch_"+n] = "assets/chars/"+n+".png");
+
 const IMG = {};
 function loadArt(onProgress){
   const keys = Object.keys(ART_SRC);
   let done = 0;
-  return Promise.all(keys.map(k=>new Promise((res,rej)=>{
+  return Promise.all(keys.map(k=> new Promise((res,rej)=>{
     const im = new Image();
-    im.onload = ()=>{ IMG[k]=im; done++; if(onProgress) onProgress(done, keys.length); res(); };
-    im.onerror = ()=>rej(new Error("Could not load "+ART_SRC[k]));
+    im.onload = ()=>{ IMG[k]=im; done++; onProgress && onProgress(done, keys.length); res(); };
+    im.onerror = ()=> rej(new Error("could not load "+ART_SRC[k]));
     im.src = ART_SRC[k];
   })));
 }
 
-/* village tileset objects, in source pixels */
-const OBJ = {
-  treeOrange: [64,96,32,32],   treeGreen: [64,144,32,32],
-  bushOrange: [64,128,16,16],  bushGreen: [64,176,16,16],
-  rock:       [112,64,16,16],
-  houseSmall: [176,0,48,48],   houseMid:  [176,48,48,48], houseBig: [192,96,80,80]
-};
+/* ---------------- rendering ---------------- */
+const bufCache = {};
+function hash2(x,y,s){ let h=x*374761393+y*668265263+s*69069; h=(h^(h>>13))*1274126177; return ((h^(h>>16))>>>0)/4294967296; }
+
+/* pick the right cell of a 3x3 autotile block for a tile whose neighbours
+   are described by `inside` */
+function autoCell(inside, x, y){
+  const col = !inside(x-1,y) ? 0 : (!inside(x+1,y) ? 2 : 1);
+  const row = !inside(x,y-1) ? 0 : (!inside(x,y+1) ? 2 : 1);
+  return [col,row];
+}
+
+function renderRegionBuffer(ri){
+  if(bufCache[ri]) return bufCache[ri];
+  const m = genRegion(ri);
+  const A = REGION_ART[ri];
+  const cv = document.createElement("canvas");
+  cv.width = MW*TILE; cv.height = MH*TILE;
+  const c = cv.getContext("2d");
+  c.imageSmoothingEnabled = false;
+  const tl = (x,y)=> (x<0||y<0||x>=MW||y>=MH) ? T.TREE : m.tiles[y*MW+x];
+
+  const blit = (img, sx, sy, sw, sh, dx, dy)=>
+    c.drawImage(img, sx, sy, sw, sh, Math.round(dx*SCALE), Math.round(dy*SCALE), sw*SCALE, sh*SCALE);
+  const cell = (tx,ty,x,y)=> blit(IMG.world, tx*SRC, ty*SRC, SRC, SRC, x*SRC, y*SRC);
+
+  /* ---- pass 1: grass everywhere ---- */
+  const g = TILE_AT.grass;
+  for(let y=0;y<MH;y++) for(let x=0;x<MW;x++) cell(g[0],g[1],x,y);
+
+  /* ---- pass 2: the region's patch material, in soft blobs ---- */
+  const patchSeed = ri*131+7;
+  const isPatch = (x,y)=>{
+    if(x<0||y<0||x>=MW||y>=MH) return false;
+    const v = tl(x,y);
+    if(v===T.WATER||v===T.PATH||v===T.FLOOR||v===T.GATE||v===T.GATEBACK) return false;
+    const n = hash2(Math.floor(x/6),Math.floor(y/5),patchSeed)*0.7
+            + hash2(Math.floor(x/3),Math.floor(y/3),patchSeed+9)*0.3;
+    return n > A.patchAt;
+  };
+  const pb = BLOCK[A.patch];
+  for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){
+    if(!isPatch(x,y)) continue;
+    const [cx2,cy2] = autoCell(isPatch,x,y);
+    cell(pb[0]+cx2, pb[1]+cy2, x, y);
+  }
+
+  /* ---- pass 3: paths and town floor, autotiled sand ---- */
+  const isPath = (x,y)=>{
+    const v = tl(x,y);
+    return v===T.PATH||v===T.FLOOR||v===T.GATE||v===T.GATEBACK||
+           v===T.WALL||v===T.HEAL||v===T.SHOP||v===T.GYM||v===T.SIGN;
+  };
+  const sb = BLOCK.sand;
+  for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){
+    if(!isPath(x,y)) continue;
+    const [cx2,cy2] = autoCell(isPath,x,y);
+    cell(sb[0]+cx2, sb[1]+cy2, x, y);
+  }
+
+  /* ---- pass 4: water, frame 0. The animated overlay redraws the rest. ---- */
+  const isWater = (x,y)=> (x<0||y<0||x>=MW||y>=MH) ? false : tl(x,y)===T.WATER;
+  for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){
+    if(!isWater(x,y)) continue;
+    const [cx2,cy2] = autoCell(isWater,x,y);
+    blit(IMG.coast, (WATER_BLOCK[0]+cx2)*SRC, (WATER_BLOCK[1]+cy2)*SRC, SRC, SRC, x*SRC, y*SRC);
+  }
+
+  /* ---- pass 5: things that stand up, top rows first so they overlap ---- */
+  const drop = (img,x,y)=>{                       // bottom-centre on the tile
+    const dx = x*SRC + SRC/2 - img.width/2;
+    const dy = y*SRC + SRC - img.height;
+    blit(img, 0,0, img.width, img.height, dx, dy);
+  };
+  const shadow = (x,y)=>{
+    const s = IMG.shadow;
+    blit(s,0,0,s.width,s.height, x*SRC+SRC/2-s.width/2, y*SRC+SRC-s.height-1);
+  };
+  for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){
+    const v = tl(x,y), h = hash2(x,y,ri);
+    if(v===T.TREE){
+      const set = A.ruins && h>0.82 ? ["ruin_pillar","ruin_pillar_broke"] : A.trees;
+      const name = set[Math.floor(h*set.length)%set.length];
+      shadow(x,y); drop(IMG[name], x, y);
+    }
+    else if(v===T.ROCK){
+      const name = A.rocks[Math.floor(h*A.rocks.length)%A.rocks.length];
+      shadow(x,y); drop(IMG[name], x, y);
+    }
+    else if(v===T.TALL || v===T.FLOWER){
+      drop(IMG[A.tuft], x, y);
+    }
+    else if(v===T.GATE||v===T.GATEBACK){
+      if(tl(x,y-1)!==T.GATE && tl(x,y-1)!==T.GATEBACK){
+        drop(IMG.gate_pillar, x-1, y+1); drop(IMG.gate_pillar, x+1, y+1);
+        const gt = IMG.gate_top;
+        blit(gt,0,0,gt.width,gt.height, x*SRC+SRC/2-gt.width/2, (y-1)*SRC);
+      }
+    }
+  }
+
+  /* ---- pass 6: buildings ---- */
+  m.buildings.forEach(b=>{
+    const img = IMG[b.art];
+    if(!img) return;
+    blit(img, 0,0, img.width, img.height, b.x*SRC, b.y*SRC);
+  });
+
+  bufCache[ri]=cv;
+  return cv;
+}
+
+/* ---------------- animated overlay ---------------- */
+/* Water cycles four frames. Tiles that sit under something tall are left on
+   frame 0 in the buffer, otherwise the overlay would repaint over a canopy. */
+const waterCells = {};
+function animWater(ri){
+  if(waterCells[ri]) return waterCells[ri];
+  const m = genRegion(ri);
+  const tl = (x,y)=> (x<0||y<0||x>=MW||y>=MH) ? T.TREE : m.tiles[y*MW+x];
+  const isWater = (x,y)=> (x<0||y<0||x>=MW||y>=MH) ? false : tl(x,y)===T.WATER;
+  const out = [];
+  for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){
+    if(!isWater(x,y)) continue;
+    let blocked = false;
+    for(let d=1;d<=3;d++){
+      const v = tl(x,y+d);
+      if(v===T.TREE||v===T.ROCK||v===T.WALL||v===T.HEAL||v===T.SHOP||v===T.GYM){ blocked=true; break; }
+    }
+    if(blocked) continue;
+    const [cx,cy] = autoCell(isWater,x,y);
+    out.push([x,y,cx,cy]);
+  }
+  waterCells[ri]=out;
+  return out;
+}
+function drawWaterAnim(c, camX, camY, w, h, t){
+  const cells = animWater(G.region);
+  const f = Math.floor(t/220)%4;
+  c.imageSmoothingEnabled = false;
+  for(const [x,y,cx,cy] of cells){
+    const dx = x*TILE-camX, dy = y*TILE-camY;
+    if(dx<-TILE||dy<-TILE||dx>w||dy>h) continue;
+    c.drawImage(IMG.coast, (WATER_BLOCK[0]+cx)*SRC, (WATER_BLOCK[1]+cy+f*3)*SRC, SRC, SRC,
+                Math.round(dx), Math.round(dy), TILE, TILE);
+  }
+}
+function drawFlowerAnim(){ /* the tuft art is static in this pack */ }
+
+const MOTES = [];
+function drawMotes(c, w, h, t){
+  const A = REGION_ART[G.region];
+  const want = A.mote==="snow"? 46 : A.mote==="dust"? 22 : 30;
+  while(MOTES.length<want) MOTES.push({x:Math.random()*w, y:Math.random()*h, s:.4+Math.random(), p:Math.random()*6.28});
+  while(MOTES.length>want) MOTES.pop();
+  c.save();
+  for(const p of MOTES){
+    const k = A.mote;
+    if(k==="snow"){ p.y += p.s*.5; p.x += Math.sin(t*.001+p.p)*.35; }
+    else if(k==="ember"){ p.y -= p.s*.6; p.x += Math.sin(t*.002+p.p)*.5; }
+    else if(k==="spark"){ p.y += Math.sin(t*.004+p.p)*.6; p.x += p.s*.4; }
+    else { p.y += p.s*.22; p.x += Math.sin(t*.0012+p.p)*.5; }
+    if(p.y>h+6) p.y=-6; if(p.y<-6) p.y=h+6;
+    if(p.x>w+6) p.x=-6; if(p.x<-6) p.x=w+6;
+    c.globalAlpha = .18 + .30*Math.abs(Math.sin(t*.002+p.p));
+    c.fillStyle = A.moteCol;
+    const r = k==="snow"? 1.8 : 1.5;
+    c.beginPath(); c.arc(p.x,p.y,r*p.s+.6,0,7); c.fill();
+  }
+  c.restore();
+}
+
+/* ---------------- people ----------------
+   Character sheets are 4 columns (walk frames) by 4 rows
+   (down, left, right, up), 32x32 each, so two tiles tall. */
+const CHAR_F = 32;
+const DIRROW = {down:0, left:1, right:2, up:3};
+function drawPerson(ctx,px,py,facing,frame,pal){
+  const img = IMG[pal.sheet] || IMG.ch_player;
+  const s = IMG.shadow;
+  ctx.imageSmoothingEnabled = false;
+  if(s) ctx.drawImage(s, 0,0, s.width, s.height,
+      Math.round(px+TILE/2-s.width*SCALE/2), Math.round(py+TILE-s.height*SCALE-1),
+      s.width*SCALE, s.height*SCALE);
+  const row = DIRROW[facing] !== undefined ? DIRROW[facing] : 0;
+  const col = frame & 3;
+  const dw = CHAR_F*SCALE, dh = CHAR_F*SCALE;
+  ctx.drawImage(img, col*CHAR_F, row*CHAR_F, CHAR_F, CHAR_F,
+    Math.round(px + TILE/2 - dw/2), Math.round(py + TILE - dh + 2), dw, dh);
+}
+
+const PLAYER_PAL = {sheet:"ch_player"};
+const NPC_PALS = [
+  {sheet:"ch_blond"}, {sheet:"ch_hat_girl"}, {sheet:"ch_purple_girl"},
+  {sheet:"ch_straw"}, {sheet:"ch_young_girl"}, {sheet:"ch_young_guy"}
+];
+const BOSS_PALS = ["ch_grass_boss","ch_fire_boss","ch_water_boss"];
 
 function genRegion(ri){
   if(mapCache[ri]) return mapCache[ri];
@@ -109,21 +312,24 @@ function genRegion(ri){
   for(let i=0;i<40;i++){ const x=3+Math.floor(rnd()*(MW-6)), y=3+Math.floor(rnd()*(MH-6)); if(at(x,y)===T.GRASS) set(x,y,T.FLOWER); }
 
   // ---- town block (left side) ----
-  const tx0=4, ty0=4, tw=18, th=14;
-  for(let y=ty0;y<ty0+th;y++) for(let x=tx0;x<tx0+tw;x++) set(x,y, (x+y)%13===0?T.FLOWER:T.FLOOR);
+  // Footprints match the artwork exactly: the hospital sprite is 6x6 tiles,
+  // the small house 5x5 and the arena 7x7, all at 16px per tile.
+  const tx0=4, ty0=4, tw=22, th=18;
+  for(let y=ty0;y<ty0+th;y++) for(let x=tx0;x<tx0+tw;x++) set(x,y,T.FLOOR);
   const buildings = [
-    {x:tx0+2, y:ty0+2, w:3, h:3, door:T.HEAL},
-    {x:tx0+12,y:ty0+2, w:3, h:3, door:T.SHOP},
-    {x:tx0+2, y:ty0+8, w:5, h:5, door:T.GYM}
+    {x:tx0+1,  y:ty0+1,  w:6, h:6, door:T.HEAL, art:"hospital"},
+    {x:tx0+12, y:ty0+2,  w:5, h:5, door:T.SHOP, art:"house_small"},
+    {x:tx0+6,  y:ty0+10, w:7, h:7, door:T.GYM,  art:REGION_ART[ri].arena},
+    {x:tx0+15, y:ty0+10, w:5, h:5, art:(ri%2? "house_small_alt":"house_small")}
   ];
   buildings.forEach(b=>{
     for(let y=b.y;y<b.y+b.h;y++) for(let x=b.x;x<b.x+b.w;x++) set(x,y,T.WALL);
-    set(b.x+Math.floor(b.w/2), b.y+b.h-1, b.door);
+    if(b.door) set(b.x+Math.floor(b.w/2), b.y+b.h-1, b.door);
   });
   // roads
   const roadY = ty0+th+2;
   for(let x=tx0+2;x<MW-3;x++){ set(x,roadY,T.PATH); set(x,roadY+1,T.PATH); }
-  for(let y=ty0+6;y<=roadY;y++){ set(tx0+8,y,T.PATH); set(tx0+9,y,T.PATH); }
+  for(let y=ty0+8;y<=roadY;y++){ set(tx0+20,y,T.PATH); set(tx0+21,y,T.PATH); }
   const branchX = 26+Math.floor(rnd()*8);
   for(let y=6;y<roadY;y++){ set(branchX,y,T.PATH); }
   // gates
@@ -138,6 +344,7 @@ function genRegion(ri){
   // which locked the whole game: no entrance, no badge, no gate east.
   buildings.forEach(b=>{
     for(let y=b.y;y<b.y+b.h;y++) for(let x=b.x;x<b.x+b.w;x++) set(x,y,T.WALL);
+    if(!b.door) return;
     const dx = b.x+Math.floor(b.w/2), dy = b.y+b.h-1;
     set(dx, dy, b.door);
     if(dy+1 < MH && !WALK[at(dx,dy+1)]) set(dx, dy+1, T.FLOOR);   // keep the approach clear
@@ -148,7 +355,7 @@ function genRegion(ri){
   const reg = REGIONS[ri];
   const walkable = (x,y)=>WALK[at(x,y)] && at(x,y)!==T.GATE && at(x,y)!==T.GATEBACK;
   // flood fill from the town so nothing is ever placed in a sealed pocket
-  const spawnX = tx0+8, spawnY = ty0+7;
+  const spawnX = tx0+2, spawnY = ty0+8;
   const reachable = new Set([spawnX+","+spawnY]);
   const stack = [[spawnX,spawnY]];
   while(stack.length){
@@ -228,223 +435,12 @@ function genRegion(ri){
   // cheap guard: a region without an arena door cannot be completed
   if(!Array.prototype.includes.call(t, T.GYM)) console.warn("Aetherfolk: region "+ri+" generated without an arena door");
 
-  const m = {tiles:t, objs, spawn:{x:tx0+8, y:ty0+7}, gateY, buildings, tx0, ty0, tw, th};
+  const m = {tiles:t, objs, spawn:{x:tx0+2, y:ty0+8}, gateY, buildings, tx0, ty0, tw, th};
   mapCache[ri]=m;
   return m;
 }
 
-/* ---------------- rendering ---------------- */
-const bufCache = {};
-function hash2(x,y,s){ let h=x*374761393+y*668265263+s*69069; h=(h^(h>>13))*1274126177; return ((h^(h>>16))>>>0)/4294967296; }
 
-const SRC = 16;              // source tile size in the tileset
-const SCALE = TILE / SRC;    // world tiles are 32px, so everything draws at 2x
-
-function renderRegionBuffer(ri){
-  if(bufCache[ri]) return bufCache[ri];
-  const m = genRegion(ri);
-  const A = REGION_ART[ri];
-  const B = BLOCKS[A.block], PB = BLOCKS.pool;
-  const cv = document.createElement("canvas");
-  cv.width = MW*TILE; cv.height = MH*TILE;
-  const c = cv.getContext("2d");
-  c.imageSmoothingEnabled = false;
-
-  const tl = (x,y)=> (x<0||y<0||x>=MW||y>=MH) ? T.TREE : m.tiles[y*MW+x];
-
-  /* draw one tile of a block, by its offset inside that block */
-  const blit = (blk, rc, x, y)=>{
-    c.drawImage(IMG.floor, (blk[0]+rc[0])*SRC, (blk[1]+rc[1])*SRC, SRC, SRC,
-                x*TILE, y*TILE, TILE, TILE);
-  };
-  /* 9-slice: pick the right edge tile from a 3x3 patch set */
-  const patchRC = (n,e,s,w)=>[ w? (e?1:2) : 0, n? (s?1:2) : 0 ];
-  /* an object from the village sheet, drawn at 2x and bottom-anchored */
-  const obj = (o, x, y, dy)=>{
-    const [sx,sy,sw,sh] = o;
-    c.drawImage(IMG.village, sx, sy, sw, sh,
-      x*TILE + TILE/2 - sw*SCALE/2, (y+1)*TILE - sh*SCALE + (dy||0), sw*SCALE, sh*SCALE);
-  };
-
-  /* ---- pass 1: ground under everything ---- */
-  for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){
-    const h = hash2(x,y,ri);
-    if(h > 0.82) blit(B, [REL.baseDeco[0] + Math.floor(h*97)%4, REL.baseDeco[1]], x, y);
-    else blit(B, REL.base, x, y);
-  }
-
-  /* ---- pass 2: surfaces that sit in the ground ---- */
-  const isPath = (x,y)=>{ const v=tl(x,y); return v===T.PATH||v===T.GATE||v===T.GATEBACK||v===T.FLOOR
-    ||v===T.WALL||v===T.HEAL||v===T.SHOP||v===T.GYM; };
-  const isWater = (x,y)=> tl(x,y)===T.WATER;
-
-  for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){
-    const v = tl(x,y), h = hash2(x,y,ri);
-
-    if(isPath(x,y)){
-      const rc = patchRC(isPath(x,y-1), isPath(x+1,y), isPath(x,y+1), isPath(x-1,y));
-      blit(B, [REL.patch[0]+rc[0], REL.patch[1]+rc[1]], x, y);
-      if(rc[0]===1 && rc[1]===1 && h>0.86) blit(B, REL.patchDeco, x, y);
-    }
-    else if(v===T.WATER){
-      const rc = patchRC(isWater(x,y-1), isWater(x+1,y), isWater(x,y+1), isWater(x-1,y));
-      blit(PB, [REL.patch[0]+rc[0], REL.patch[1]+rc[1]], x, y);
-      /* the pool set is pale, so a wash turns it into real water */
-      c.save();
-      c.globalCompositeOperation = "source-atop";
-      c.fillStyle = "rgba(26,86,148,.62)";
-      c.fillRect(x*TILE, y*TILE, TILE, TILE);
-      c.restore();
-    }
-    else if(v===T.TALL){
-      const set = hash2(x,y,ri+4)>.5 ? 0 : 3;   // two bush colours per block
-      blit(B, [REL.bush[0] + set + (x&1), REL.bush[1]], x, y);
-    }
-    else if(v===T.FLOWER){
-      c.drawImage(IMG.flower, 0, 0, SRC, SRC, x*TILE, y*TILE, TILE, TILE);
-    }
-  }
-
-  /* ---- pass 3: things that stand up, top row first so they overlap ---- */
-  for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){
-    const v = tl(x,y), h = hash2(x,y,ri);
-    if(v===T.TREE){
-      c.fillStyle="rgba(0,0,0,.22)";
-      c.beginPath(); c.ellipse(x*TILE+16, y*TILE+27, 13, 5, 0, 0, 7); c.fill();
-      obj(h>0.5? OBJ.treeGreen : OBJ.treeOrange, x, y, -2);
-    }
-    else if(v===T.ROCK){
-      c.fillStyle="rgba(0,0,0,.20)";
-      c.beginPath(); c.ellipse(x*TILE+16, y*TILE+27, 11, 4, 0, 0, 7); c.fill();
-      obj(h>0.5? OBJ.rock : (h>0.25? OBJ.bushGreen : OBJ.bushOrange), x, y, -1);
-    }
-    else if(v===T.SIGN){
-      c.fillStyle="rgba(0,0,0,.2)";
-      c.beginPath(); c.ellipse(x*TILE+16, y*TILE+29, 8, 3.5, 0, 0, 7); c.fill();
-      c.fillStyle="#6B5326"; c.fillRect(x*TILE+14, y*TILE+18, 4, 11);
-      c.fillStyle="#A8834C"; c.fillRect(x*TILE+4, y*TILE+6, 24, 14);
-      c.fillStyle="#C9A567"; c.fillRect(x*TILE+5, y*TILE+7, 22, 5);
-      c.fillStyle="#5A4227"; c.fillRect(x*TILE+7, y*TILE+13, 18, 2); c.fillRect(x*TILE+7, y*TILE+16, 11, 2);
-    }
-    else if(v===T.GATE||v===T.GATEBACK){
-      c.fillStyle="#4A3A22"; c.fillRect(x*TILE+1, y*TILE, 5, TILE); c.fillRect(x*TILE+26, y*TILE, 5, TILE);
-      c.fillStyle="#63502F"; c.fillRect(x*TILE+1, y*TILE, 5, 4); c.fillRect(x*TILE+26, y*TILE, 5, 4);
-      c.fillStyle="#E0A73C"; c.fillRect(x*TILE+8, y*TILE+12, 16, 6);
-      c.fillStyle="rgba(0,0,0,.25)"; c.fillRect(x*TILE+8, y*TILE+16, 16, 2);
-    }
-  }
-
-  /* ---- pass 4: buildings ---- */
-  m.buildings.forEach(b=>{
-    const art = b.door===T.HEAL? OBJ.houseSmall : b.door===T.SHOP? OBJ.houseMid : OBJ.houseBig;
-    const trim = b.door===T.HEAL? "#6FBF73" : b.door===T.SHOP? "#4FA3D9" : "#E0A73C";
-    const [sx,sy,sw,sh] = art;
-    c.fillStyle="rgba(0,0,0,.20)";
-    c.fillRect(b.x*TILE-4, (b.y+b.h)*TILE-8, b.w*TILE+8, 8);
-    c.drawImage(IMG.village, sx, sy, sw, sh, b.x*TILE, b.y*TILE, sw*SCALE, sh*SCALE);
-    /* a coloured shingle band and a hanging sign tell the three apart */
-    const cx = b.x*TILE + b.w*TILE/2;
-    c.fillStyle = trim; c.fillRect(cx-26, b.y*TILE-6, 52, 5);
-    c.fillStyle = "rgba(0,0,0,.30)"; c.fillRect(cx-26, b.y*TILE-2, 52, 2);
-    c.fillStyle = "#2A2016"; c.fillRect(cx-16, b.y*TILE+2, 32, 3);
-    c.fillStyle = trim; c.fillRect(cx-14, b.y*TILE+5, 28, 11);
-    c.fillStyle = "#1A1410"; c.fillRect(cx-10, b.y*TILE+8, 20, 5);
-    /* lanterns beside the doorway */
-    const dx = (b.x+Math.floor(b.w/2))*TILE, dy = (b.y+b.h-1)*TILE;
-    c.fillStyle = "#E0A73C"; c.fillRect(dx-6, dy+10, 4, 4); c.fillRect(dx+34, dy+10, 4, 4);
-  });
-
-  /* ---- pass 5: the region's colour wash ---- */
-  if(A.desat){
-    c.save();
-    c.globalCompositeOperation = "saturation";
-    c.globalAlpha = A.desat;
-    c.fillStyle = "hsl(0,0%,50%)";
-    c.fillRect(0,0,cv.width,cv.height);
-    c.restore();
-  }
-  if(A.wash){
-    c.save();
-    c.globalCompositeOperation = "source-atop";
-    c.globalAlpha = A.wash[1];
-    c.fillStyle = A.wash[0];
-    c.fillRect(0,0,cv.width,cv.height);
-    c.restore();
-  }
-
-  bufCache[ri]=cv;
-  return cv;
-}
-
-/* ---------------- animated overlay ---------------- */
-function drawWaterAnim(c, camX, camY, w, h, t){
-  const m = genRegion(G.region);
-  const x0 = Math.max(0,Math.floor(camX/TILE)), y0 = Math.max(0,Math.floor(camY/TILE));
-  const x1 = Math.min(MW-1, Math.ceil((camX+w)/TILE)), y1 = Math.min(MH-1, Math.ceil((camY+h)/TILE));
-  c.save(); c.globalAlpha = .30; c.fillStyle = "#CFF0FA";
-  for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){
-    if(m.tiles[y*MW+x]!==T.WATER) continue;
-    const px = x*TILE-camX, py = y*TILE-camY;
-    const a = Math.sin(t*0.0022 + hash2(x,y,G.region)*6.28);
-    c.fillRect(px+6+a*3, py+10, 12, 2);
-    c.fillRect(px+16-a*3, py+21, 8, 2);
-  }
-  c.restore();
-}
-
-/* flowers wave; four frames in tileset_animated.png */
-function drawFlowerAnim(c, camX, camY, w, h, t){
-  const m = genRegion(G.region);
-  const x0 = Math.max(0,Math.floor(camX/TILE)), y0 = Math.max(0,Math.floor(camY/TILE));
-  const x1 = Math.min(MW-1, Math.ceil((camX+w)/TILE)), y1 = Math.min(MH-1, Math.ceil((camY+h)/TILE));
-  for(let y=y0;y<=y1;y++) for(let x=x0;x<=x1;x++){
-    if(m.tiles[y*MW+x]!==T.FLOWER) continue;
-    const f = (Math.floor(t/220) + x + y) % 4;
-    c.drawImage(IMG.flower, f*SRC, 0, SRC, SRC, x*TILE-camX, y*TILE-camY, TILE, TILE);
-  }
-}
-
-/* weather and light motes */
-const MOTES = [];
-function drawMotes(c, w, h, t){
-  const A = REGION_ART[G.region];
-  const want = A.mote==="snow"? 46 : A.mote==="dust"? 22 : 30;
-  while(MOTES.length<want) MOTES.push({x:Math.random()*w, y:Math.random()*h, s:.4+Math.random(), p:Math.random()*6.28});
-  while(MOTES.length>want) MOTES.pop();
-  c.save();
-  for(const p of MOTES){
-    const k = A.mote;
-    if(k==="snow"){ p.y += p.s*.5; p.x += Math.sin(t*.001+p.p)*.35; }
-    else if(k==="ember"){ p.y -= p.s*.6; p.x += Math.sin(t*.002+p.p)*.5; }
-    else if(k==="spark"){ p.y += Math.sin(t*.004+p.p)*.6; p.x += p.s*.4; }
-    else { p.y += p.s*.22; p.x += Math.sin(t*.0012+p.p)*.5; }
-    if(p.y>h+6) p.y=-6; if(p.y<-6) p.y=h+6;
-    if(p.x>w+6) p.x=-6; if(p.x<-6) p.x=w+6;
-    c.globalAlpha = .18 + .30*Math.abs(Math.sin(t*.002+p.p));
-    c.fillStyle = A.moteCol;
-    c.fillRect(p.x, p.y, 2, 2);
-  }
-  c.restore();
-}
-
-/* ---------------- people ----------------
-   The sheets are 4 columns (down, up, left, right) by 7 rows;
-   rows 0-3 are the walk cycle and row 0 doubles as the idle pose. */
-const DIRCOL = {down:0, up:1, left:2, right:3};
-function drawPerson(ctx,px,py,facing,frame,pal){
-  const img = IMG[pal.sheet] || IMG.char0;
-  ctx.fillStyle="rgba(0,0,0,.26)";
-  ctx.beginPath(); ctx.ellipse(px+TILE/2, py+TILE-3, 9, 4, 0, 0, 7); ctx.fill();
-  const col = DIRCOL[facing] !== undefined ? DIRCOL[facing] : 0;
-  const row = frame & 3;
-  ctx.drawImage(img, col*SRC, row*SRC, SRC, SRC, px, py-6, TILE, TILE);
-}
-
-const PLAYER_PAL = {sheet:"char0"};
-const NPC_PALS = [
-  {sheet:"char1"}, {sheet:"char2"}, {sheet:"char0"},
-  {sheet:"char2"}, {sheet:"char1"}, {sheet:"char0"}
-];
 /* ---------------- sound ---------------- */
 let AC = null, sfxOn = true;
 try{ sfxOn = localStorage.getItem("aetherfolk.sound") !== "off"; }catch(e){}

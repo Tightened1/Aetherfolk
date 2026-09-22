@@ -1,26 +1,35 @@
 # Art credits
 
-## Tilesets and character sprites
-**Ninja Adventure Asset Pack** by **pixel-boy** and **AAA**
-https://pixel-boy.itch.io/ninja-adventure-asset-pack
-Licence: **CC0 1.0 Universal (public domain)** — free for any use, commercial
-included, no attribution required. Credited here anyway because it is good work.
+## Tilesets, characters, buildings, effects and battle backgrounds
+**Monster Taming Game Essentials — MyPixelWorld Special Packs #01**
+by **scarloxy** (Ismael Garcia)
+https://scarloxy.itch.io/mpwsp01
 
-Files taken from that pack:
-- `tileset_floor.png` — terrain autotiles (grass, sand, snow, mud, water)
-- `tileset_village_abandoned.png` — trees, rocks, bushes, houses
-- `tileset_animated.png` — animated flowers
-- `char_ninja_blue.png`, `char_samurai_blue.png`, `char_samurai_green.png` — walk cycles
-- `pig.png` — animal
+Licence: **Creative Commons Attribution 4.0 International (CC BY 4.0)**
+https://creativecommons.org/licenses/by/4.0/
 
-Sprite sheet layout, for anyone editing these: 16x16 frames, four columns
-(down, up, left, right) by seven rows. Rows 0-3 are the walk cycle and row 0
-doubles as the idle pose.
+Attribution is required by this licence, so it is given here, in the README and
+on the game's title screen. The artist states the pack is fully original work.
+
+Files used, taken from the ClearCode-formatted download and converted from the
+4x upscale back to their native 16px:
+
+- `tiles/world.png` — terrain autotiles (grass, sand, snow, rock)
+- `tiles/coast.png` — water autotiles, four animation frames
+- `objects/` — trees, palms, ice trees, rocks, encounter grass, houses,
+  hospital, arenas, ruins, gate pieces, character shadow
+- `chars/` — ten character sheets, 32x32 frames, four walk frames per
+  direction in row order down, left, right, up
+- `bg/` — three battle backgrounds at their original resolution
+
+Nothing here has been traced, recoloured or derived from any commercial game.
 
 ## Creature sprites
-Generated procedurally by `js/creatures.js`. No external art, no traced or
-copied designs. Every one of the 150 is drawn from a seeded "design genome"
-and checked against the others so no two render identically.
+Generated procedurally by `js/creatures.js`. No external art. Every one of the
+150 is drawn from a seeded design genome and checked against the others so no
+two render identically. These are Claude's own pixel art, not scarloxy's, and
+the difference in hand is visible — see the README.
 
-## Nothing here is derived from any commercial game
-No Pokemon, Nintendo or Game Freak assets are used, traced or recreated.
+## Previously used, now removed
+An earlier build used the Ninja Adventure pack by pixel-boy and AAA (CC0). No
+files from it remain.

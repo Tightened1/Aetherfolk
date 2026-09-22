@@ -157,3 +157,6 @@ img.cre{display:block;width:100%;height:auto;image-rendering:pixelated;image-ren
 .hidden{display:none!important}
 ::-webkit-scrollbar{width:9px}::-webkit-scrollbar-thumb{background:var(--line)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+#title .credit{margin-top:14px;font-size:10px;opacity:.72;line-height:1.5;text-align:center}
+#title .credit span{opacity:.8}
