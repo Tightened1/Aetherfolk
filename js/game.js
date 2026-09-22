@@ -27,14 +27,18 @@ function trimBuffers(){
   const ks = Object.keys(bufCache);
   if(ks.length>2) ks.slice(0, ks.length-2).forEach(k=>{ if(+k!==G.region) delete bufCache[k]; });
 }
+let INSIDE = null;                       // the interior map, when we are in one
+function curMap(){ return INSIDE || genRegion(G.region); }
+function curBuf(){ return INSIDE ? renderInterior(INSIDE) : renderRegionBuffer(G.region); }
+function curW(){ return INSIDE ? INSIDE.w : MW; }
+function curH(){ return INSIDE ? INSIDE.h : MH; }
 function tileAt(x,y){
-  const m = genRegion(G.region);
-  if(x<0||y<0||x>=MW||y>=MH) return T.TREE;
-  return m.tiles[y*MW+x];
+  const m = curMap(), w = curW(), h = curH();
+  if(x<0||y<0||x>=w||y>=h) return T.TREE;
+  return m.tiles[y*w+x];
 }
 function objAt(x,y){
-  const m = genRegion(G.region);
-  return m.objs.find(o=>o.x===x&&o.y===y && !objDone(o));
+  return curMap().objs.find(o=>o.x===x&&o.y===y && !objDone(o));
 }
 function objDone(o){
   if(o.kind==="trainer") return !!G.beaten[G.region+":t"+o.idx];
@@ -45,27 +49,39 @@ function blocked(x,y){
   const t = tileAt(x,y);
   if(!WALK[t]) return true;
   const o = objAt(x,y);
-  if(o && (o.kind==="npc"||o.kind==="trainer"||o.kind==="sign")) return true;
+  if(o && (o.kind==="npc"||o.kind==="trainer"||o.kind==="sign"||o.solid)) return true;
   return false;
 }
 const DIRV = {up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
 
 function draw(){
   const w = $("world").clientWidth, h = $("world").clientHeight;
-  const buf = renderRegionBuffer(G.region);
+  const buf = curBuf();
   const A = REGION_ART[G.region];
   const t = performance.now();
+  const mapW = curW()*TILE, mapH = curH()*TILE;
   const cx = P.px + TILE/2 - w/2, cy = P.py + TILE/2 - h/2;
   // round the camera: fractional source coords tear the tiled background apart
-  const camX = Math.round(Math.max(0, Math.min(Math.max(0, MW*TILE - w), cx)));
-  const camY = Math.round(Math.max(0, Math.min(Math.max(0, MH*TILE - h), cy)));
-  ctx.fillStyle = "#0B0F0A"; ctx.fillRect(0,0,w,h);
-  const sw = Math.min(w, buf.width - camX), sh = Math.min(h, buf.height - camY);
-  ctx.drawImage(buf, camX, camY, sw, sh, 0, 0, sw, sh);
-  drawWaterAnim(ctx, camX, camY, w, h, t);
-  drawFlowerAnim(ctx, camX, camY, w, h, t);
+  let camX = Math.round(Math.max(0, Math.min(Math.max(0, mapW - w), cx)));
+  let camY = Math.round(Math.max(0, Math.min(Math.max(0, mapH - h), cy)));
+  // a room is smaller than the viewport, so centre it instead of pinning it
+  if(mapW < w) camX = -Math.round((w-mapW)/2);
+  if(mapH < h) camY = -Math.round((h-mapH)/2);
 
-  const m = genRegion(G.region);
+  ctx.fillStyle = INSIDE ? "#1B1730" : "#0B0F0A";
+  ctx.fillRect(0,0,w,h);
+  ctx.imageSmoothingEnabled = false;
+  const srcX = Math.max(0,camX), srcY = Math.max(0,camY);
+  const dstX = Math.max(0,-camX), dstY = Math.max(0,-camY);
+  const sw = Math.min(buf.width-srcX, w-dstX), sh = Math.min(buf.height-srcY, h-dstY);
+  if(sw>0 && sh>0) ctx.drawImage(buf, srcX, srcY, sw, sh, dstX, dstY, sw, sh);
+
+  if(!INSIDE){
+    drawWaterAnim(ctx, camX, camY, w, h, t);
+    drawFlowerAnim(ctx, camX, camY, w, h, t);
+  }
+
+  const m = curMap();
   const drawables = [];
   m.objs.forEach(o=>{
     if(objDone(o)) return;
@@ -74,7 +90,6 @@ function draw(){
     drawables.push({y:o.y, fn:()=>{
       if(o.kind==="item"){
         const bob = Math.sin(t*.003 + o.x + o.y)*2;
-        const im = IMG.grass;
         ctx.fillStyle="rgba(0,0,0,.24)"; ctx.beginPath(); ctx.ellipse(sx+16,sy+28,8,3.6,0,0,7); ctx.fill();
         ctx.fillStyle="#C9A13E"; ctx.fillRect(sx+8,sy+12+bob,16,12);
         ctx.fillStyle="#E8CE7A"; ctx.fillRect(sx+8,sy+12+bob,16,5);
@@ -85,11 +100,12 @@ function draw(){
         const im = IMG.ruin_pillar_broke;
         ctx.drawImage(im,0,0,im.width,im.height, sx+16-im.width, sy+32-im.height*2, im.width*2, im.height*2);
       } else {
-        const pal = NPC_PALS[(o.x*3+o.y+(o.idx||0))%NPC_PALS.length];
-        const dir = o.kind==="trainer"? "down" : ["down","left","right","up"][(o.x+o.y)%4];
+        const pal = o.sheet ? {sheet:o.sheet}
+          : o.kind==="trainer" ? {sheet:BOSS_PALS[(o.idx||0)%BOSS_PALS.length]}
+          : NPC_PALS[(o.x*3+o.y+(o.idx||0))%NPC_PALS.length];
+        const dir = o.facing || (o.kind==="trainer"? "down" : ["down","left","right","up"][(o.x+o.y)%4]);
         const fr = o.kind==="trainer"? 0 : Math.floor(t/380 + o.x)%4;
-        const use = o.kind==="trainer"? {sheet:BOSS_PALS[(o.idx||0)%BOSS_PALS.length]} : pal;
-        drawPerson(ctx, sx, sy, dir, fr, use);
+        drawPerson(ctx, sx, sy, dir, fr, pal);
         if(o.kind==="trainer"){
           const fl = Math.sin(t*.004+o.x)*1.6;
           ctx.fillStyle="#E0A73C"; ctx.beginPath();
@@ -101,19 +117,20 @@ function draw(){
   drawables.push({y:P.y+0.5, fn:()=>drawPerson(ctx, Math.round(P.px-camX), Math.round(P.py-camY), P.dir, P.frame, PLAYER_PAL)});
   drawables.sort((a,b)=>a.y-b.y).forEach(d=>d.fn());
 
-  // tall grass closes over whoever is standing in it
-  const grassOver = (gx,gy)=>{
-    if(tileAt(gx,gy)!==T.TALL) return;
-    const im = IMG[REGION_ART[G.region].tuft];
-    const sway = Math.sin(t*.0035+gx)*1.5;
-    ctx.imageSmoothingEnabled=false;
-    ctx.drawImage(im, 0, 0, im.width, im.height,
-      Math.round(gx*TILE-camX+sway), Math.round(gy*TILE-camY+10), TILE, TILE-10);
-  };
-  grassOver(P.x,P.y);
-  if(P.moving) grassOver(P.tx,P.ty);
-
-  drawMotes(ctx, w, h, t);
+  if(!INSIDE){
+    // tall grass closes over whoever is standing in it
+    const grassOver = (gx,gy)=>{
+      if(tileAt(gx,gy)!==T.TALL) return;
+      const im = IMG[REGION_ART[G.region].tuft];
+      const sway = Math.sin(t*.0035+gx)*1.5;
+      ctx.imageSmoothingEnabled=false;
+      ctx.drawImage(im, 0, 0, im.width, im.height,
+        Math.round(gx*TILE-camX+sway), Math.round(gy*TILE-camY+10), TILE, TILE-10);
+    };
+    grassOver(P.x,P.y);
+    if(P.moving) grassOver(P.tx,P.ty);
+    drawMotes(ctx, w, h, t);
+  }
 
   // light and vignette
   if(!vignette || vigW!==w || vigH!==h){
@@ -143,7 +160,7 @@ function step(){
     P.py = (P.y+dy*Math.min(1,P.prog))*TILE;
     if(P.prog>=1){
       P.moving=false; P.x=P.tx; P.y=P.ty; P.px=P.x*TILE; P.py=P.y*TILE;
-      G.x=P.x; G.y=P.y; G.facing=P.dir; G.steps++;
+      if(!INSIDE){ G.x=P.x; G.y=P.y; G.facing=P.dir; G.steps++; }
       onArrive();
     }
   } else P.frame = 0;
@@ -153,12 +170,16 @@ function step(){
 
 function onArrive(){
   const t = tileAt(P.x,P.y);
+  if(INSIDE){
+    if(t===T.EXIT) leaveInterior();
+    return;
+  }
   const o = objAt(P.x,P.y);
   if(o && o.kind==="item"){ pickUpItem(o); return; }
   if(t===T.GATE){ travel(1); return; }
   if(t===T.GATEBACK){ travel(-1); return; }
   // trainer spots you
-  const m = genRegion(G.region);
+  const m = curMap();
   const spotter = m.objs.find(ob=>ob.kind==="trainer" && !objDone(ob) &&
     Math.abs(ob.x-P.x)+Math.abs(ob.y-P.y)===1);
   if(spotter){ startTrainerBattle(spotter); return; }
@@ -168,9 +189,30 @@ function onArrive(){
 
 function bumpTile(x,y){
   const t = tileAt(x,y);
-  if(t===T.HEAL) return openHeal();
-  if(t===T.SHOP) return openShop();
-  if(t===T.GYM) return openGym();
+  if(t===T.HEAL) return enterInterior("heal");
+  if(t===T.SHOP) return enterInterior("shop");
+  if(t===T.GYM)  return enterInterior("gym");
+}
+
+/* ---------------- interiors ---------------- */
+let outsideAt = null;
+async function enterInterior(kind){
+  if(INSIDE) return;
+  outsideAt = {x:P.x, y:P.y, dir:P.dir};
+  INSIDE = makeInterior(kind, G.region);
+  const sp = INSIDE.spawn;
+  P.x=sp.x; P.y=sp.y; P.px=P.x*TILE; P.py=P.y*TILE; P.dir="up"; P.moving=false;
+  sfx("door");
+  await say(INSIDE.style.title, 700);
+}
+function leaveInterior(){
+  if(!INSIDE) return;
+  INSIDE = null;
+  if(outsideAt){ P.x=outsideAt.x; P.y=outsideAt.y; P.dir="down"; }
+  P.px=P.x*TILE; P.py=P.y*TILE; P.moving=false;
+  G.x=P.x; G.y=P.y;
+  sfx("door");
+  saveGame();
 }
 
 /* ---------------- dialogue ---------------- */
@@ -205,9 +247,12 @@ function interact(){
   const [dx,dy]=DIRV[P.dir];
   const nx=P.x+dx, ny=P.y+dy;
   const t = tileAt(nx,ny);
-  if(t===T.HEAL) return openHeal();
-  if(t===T.SHOP) return openShop();
-  if(t===T.GYM) return openGym();
+  if(t===T.HEAL) return enterInterior("heal");
+  if(t===T.SHOP) return enterInterior("shop");
+  if(t===T.GYM)  return enterInterior("gym");
+  if(o && o.kind==="heal") return openHeal();
+  if(o && o.kind==="shop") return openShop();
+  if(o && o.kind==="gym")  return openGym();
   const o = objAt(nx,ny);
   if(!o) return;
   if(o.kind==="npc"||o.kind==="sign") return showDialog({name:o.name, text:o.text});

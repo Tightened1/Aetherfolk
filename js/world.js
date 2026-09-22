@@ -64,9 +64,11 @@ const ART_SRC = {
  "house_small","house_small_alt","house_large","house_large_alt","hospital",
  "arena_plant","arena_water","arean_fire","ruin_pillar","ruin_pillar_broke",
  "ruin_gate","gate_pillar","gate_top"].forEach(n=> ART_SRC[n] = "assets/objects/"+n+".png");
-const CHARS = ["player","blond","hat_girl","purple_girl","straw","young_girl",
-               "young_guy","fire_boss","grass_boss","water_boss"];
-CHARS.forEach(n=> ART_SRC["ch_"+n] = "assets/chars/"+n+".png");
+const CHARS = ["player"];
+for(let i=0;i<10;i++) CHARS.push("town"+i);
+for(let i=0;i<12;i++) CHARS.push("forest"+i);
+CHARS.forEach(n=> ART_SRC["ch_"+n] = "assets/people/"+n+".png");
+ART_SRC.interior = "assets/interior/interior.png";
 
 const IMG = {};
 function loadArt(onProgress){
@@ -253,10 +255,11 @@ function drawMotes(c, w, h, t){
 }
 
 /* ---------------- people ----------------
-   Character sheets are 4 columns (walk frames) by 4 rows
-   (down, left, right, up), 32x32 each, so two tiles tall. */
-const CHAR_F = 32;
+   Screen Smith's sheets are 3 columns (walk frames) by 4 rows
+   (down, left, right, up) at 18x26. Frame 1 is the standing pose. */
+const CHAR_W = 18, CHAR_H = 26;
 const DIRROW = {down:0, left:1, right:2, up:3};
+const WALK_CYCLE = [1,0,1,2];
 function drawPerson(ctx,px,py,facing,frame,pal){
   const img = IMG[pal.sheet] || IMG.ch_player;
   const s = IMG.shadow;
@@ -265,18 +268,21 @@ function drawPerson(ctx,px,py,facing,frame,pal){
       Math.round(px+TILE/2-s.width*SCALE/2), Math.round(py+TILE-s.height*SCALE-1),
       s.width*SCALE, s.height*SCALE);
   const row = DIRROW[facing] !== undefined ? DIRROW[facing] : 0;
-  const col = frame & 3;
-  const dw = CHAR_F*SCALE, dh = CHAR_F*SCALE;
-  ctx.drawImage(img, col*CHAR_F, row*CHAR_F, CHAR_F, CHAR_F,
-    Math.round(px + TILE/2 - dw/2), Math.round(py + TILE - dh + 2), dw, dh);
+  const col = WALK_CYCLE[frame & 3];
+  const dw = CHAR_W*SCALE, dh = CHAR_H*SCALE;
+  ctx.drawImage(img, col*CHAR_W, row*CHAR_H, CHAR_W, CHAR_H,
+    Math.round(px + TILE/2 - dw/2), Math.round(py + TILE - dh + 3), dw, dh);
 }
 
 const PLAYER_PAL = {sheet:"ch_player"};
 const NPC_PALS = [
-  {sheet:"ch_blond"}, {sheet:"ch_hat_girl"}, {sheet:"ch_purple_girl"},
-  {sheet:"ch_straw"}, {sheet:"ch_young_girl"}, {sheet:"ch_young_guy"}
+  {sheet:"ch_town0"}, {sheet:"ch_town1"}, {sheet:"ch_town2"}, {sheet:"ch_town3"},
+  {sheet:"ch_town4"}, {sheet:"ch_town5"}, {sheet:"ch_town6"}, {sheet:"ch_town7"},
+  {sheet:"ch_town8"}, {sheet:"ch_town9"}
 ];
-const BOSS_PALS = ["ch_grass_boss","ch_fire_boss","ch_water_boss"];
+/* wilderness trainers come from the forest set */
+const BOSS_PALS = [];
+for(let i=0;i<12;i++) BOSS_PALS.push("ch_forest"+i);
 
 function genRegion(ri){
   if(mapCache[ri]) return mapCache[ri];
@@ -467,6 +473,7 @@ function sfx(kind){
     case "level":  tone(523,.09,"square",.05); setTimeout(()=>tone(659,.09,"square",.05),95); setTimeout(()=>tone(784,.18,"square",.05),190); break;
     case "catch":  tone(440,.08,"square",.05); setTimeout(()=>tone(587,.08,"square",.05),90); setTimeout(()=>tone(880,.25,"square",.05),180); break;
     case "shake":  tone(320,.07,"square",.04); break;
+    case "door":  tone(420,.09,"square",.05); setTimeout(()=>tone(300,.12,"square",.04),90); break;
     case "badge":  [523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,.2,"square",.05),i*110)); break;
   }
 }
