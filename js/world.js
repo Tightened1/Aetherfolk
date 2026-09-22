@@ -114,7 +114,7 @@ function genRegion(ri){
   const buildings = [
     {x:tx0+2, y:ty0+2, w:3, h:3, door:T.HEAL},
     {x:tx0+12,y:ty0+2, w:3, h:3, door:T.SHOP},
-    {x:tx0+6, y:ty0+8, w:5, h:5, door:T.GYM}
+    {x:tx0+2, y:ty0+8, w:5, h:5, door:T.GYM}
   ];
   buildings.forEach(b=>{
     for(let y=b.y;y<b.y+b.h;y++) for(let x=b.x;x<b.x+b.w;x++) set(x,y,T.WALL);
@@ -132,6 +132,16 @@ function genRegion(ri){
   set(0,gateY,T.GATEBACK); set(1,gateY,T.GATEBACK); set(0,gateY+1,T.GATEBACK); set(1,gateY+1,T.GATEBACK);
   set(2,gateY,T.PATH); set(2,gateY+1,T.PATH); set(3,gateY,T.PATH); set(3,gateY+1,T.PATH);
   for(let x=3;x<tx0+2;x++){ set(x,gateY,T.PATH); set(x,gateY+1,T.PATH); }
+
+  // Roads are carved after the buildings, so re-stamp every building and its
+  // door afterwards. A road once ran through the arena and deleted its door,
+  // which locked the whole game: no entrance, no badge, no gate east.
+  buildings.forEach(b=>{
+    for(let y=b.y;y<b.y+b.h;y++) for(let x=b.x;x<b.x+b.w;x++) set(x,y,T.WALL);
+    const dx = b.x+Math.floor(b.w/2), dy = b.y+b.h-1;
+    set(dx, dy, b.door);
+    if(dy+1 < MH && !WALK[at(dx,dy+1)]) set(dx, dy+1, T.FLOOR);   // keep the approach clear
+  });
 
   // ---- objects ----
   const objs = [];
@@ -215,6 +225,9 @@ function genRegion(ri){
       if(n>=3) t[y*MW+x]=T.WATER;
     }
   }
+  // cheap guard: a region without an arena door cannot be completed
+  if(!Array.prototype.includes.call(t, T.GYM)) console.warn("Aetherfolk: region "+ri+" generated without an arena door");
+
   const m = {tiles:t, objs, spawn:{x:tx0+8, y:ty0+7}, gateY, buildings, tx0, ty0, tw, th};
   mapCache[ri]=m;
   return m;
