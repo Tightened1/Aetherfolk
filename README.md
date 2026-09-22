@@ -1,0 +1,78 @@
+# Aetherfolk — Creature Expedition
+
+A browser creature-collecting RPG. Eight regions, eight arenas, 150 creatures,
+all original. Runs entirely client side, no build step, no dependencies.
+
+## Play it
+
+Open `index.html` **through a web server**, not by double-clicking it. The game
+loads PNG tilesets, and browsers block file reads from `file://` pages.
+
+Quickest local server:
+
+```bash
+cd aetherfolk
+python3 -m http.server 8000
+```
+
+Then visit http://localhost:8000
+
+## Put it online with GitHub Pages
+
+1. Create a new repository on GitHub. Public, no README (this folder has one).
+2. Upload this whole folder's contents. Either drag the files into the
+   "uploading an existing file" page, or from a terminal:
+
+   ```bash
+   cd aetherfolk
+   git init
+   git add .
+   git commit -m "Aetherfolk"
+   git branch -M main
+   git remote add origin https://github.com/YOUR-NAME/aetherfolk.git
+   git push -u origin main
+   ```
+
+3. In the repository, go to **Settings → Pages**.
+4. Under "Build and deployment", set **Source** to *Deploy from a branch*,
+   branch **main**, folder **/ (root)**. Save.
+5. Wait about a minute, then load
+   `https://YOUR-NAME.github.io/aetherfolk/`
+
+The `.nojekyll` file is there so GitHub serves every folder as-is.
+
+## Saving
+
+Progress is written to the browser's `localStorage` under `aetherfolk.save.v1`,
+automatically after battles, purchases and pickups, and from Menu → Save. Saves
+belong to one browser on one device. Clearing site data wipes them.
+
+## Layout
+
+```
+index.html        markup and the stage
+css/style.css     all styling
+js/data.js        types, type chart, moves, 150 species, items, regions
+js/creatures.js   procedural pixel-art creature sprites
+js/model.js       creature instances, stats, XP, save state
+js/world.js       region generation, tile rendering, characters
+js/battle.js      damage, status, AI, catching, the battle loop
+js/game.js        main loop, input, menus, interactions
+assets/           CC0 tilesets and character sheets (see CREDITS.md)
+```
+
+Scripts load in that order and share globals, so keep the order in
+`index.html` if you add files.
+
+## Editing things
+
+- **Creatures** live in `SPECIES_SRC` in `js/data.js`, one per line:
+  `name|type1|type2|archetype|statSpread|total|evolveLevel,evolvesInto`
+- **Creature looks** come from the archetype plus a genome in `js/creatures.js`.
+  Change a species' archetype and its sprite changes with it.
+- **Regions** are the `REGIONS` array in `js/data.js`; their art is
+  `REGION_ART` in `js/world.js`.
+
+## Licence
+
+Code MIT (see LICENSE). Artwork CC0, credited in `assets/CREDITS.md`.
